@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+  #!/usr/bin/env python3
 
 import pdb
 import os
@@ -105,7 +105,16 @@ class CameraCalibrator:
         HINT: You MAY find the function np.meshgrid() useful.
         """
         ########## Code starts here ##########
-
+        nboards = len(u_meas)
+        d = self.d_square
+        x = np.linspace(0, 8*d, 9)
+        y = np.linspace(0, 6*d, 7)
+        X, Y = np.meshgrid(x, y)
+        X = np.transpose(X.flatten())
+        Y = np.transpose(Y.flatten())
+        Xg = [X]*nboards
+        Yg = [Y]*nboards
+        corner_coordinates = (Xg, Yg)
         ########## Code ends here ##########
         return corner_coordinates
 
@@ -124,7 +133,38 @@ class CameraCalibrator:
         HINT: Some numpy functions that might come in handy are stack, vstack, hstack, column_stack, expand_dims, zeros_like, and ones_like.
         """
         ########## Code starts here ##########
-
+        n = self.n_corners_per_chessboard
+        """
+        M_bar = np.transpose(np.vstack((X,Y,np.ones_like(X))))
+        uM_bar = np.transpose(np.vstack((X,Y,np.ones_like(X))))
+        vM_bar = np.transpose(np.vstack((X,Y,np.ones_like(X))))
+        for k in range(n):
+            uM_bar[k] = -1*u_meas[k]*uM_bar[k, :]
+            vM_bar[k] = -1*v_meas[k]*vM_bar[k, :]
+        
+        L_top = np.hstack((M_bar, np.zeros_like(M_bar), uM_bar))
+        L_bottom = np.hstack((np.zeros_like(M_bar), M_bar, vM_bar))
+        
+        L = np.vstack((L_top, L_bottom))
+        """
+        L = np.zeros((1,9))
+        
+        for k in range(n):
+            M_bar = np.hstack((X[k],Y[k],1))
+            uM_bar = np.hstack((X[k],Y[k],1))
+            vM_bar = np.hstack((X[k],Y[k],1))
+            uM_bar = -1*u_meas[k]*uM_bar
+            vM_bar = -1*v_meas[k]*vM_bar
+            L_temp = np.vstack((np.hstack((M_bar, np.zeros_like(M_bar), uM_bar)), np.hstack((np.zeros_like(M_bar), M_bar, vM_bar))))
+            L = np.vstack((L, L_temp))
+        L = L[1:,:]
+        
+        _, s, vh = np.linalg.svd(L)
+        x = vh[-1, :]
+        
+        H = np.reshape(x,(3,3))
+        
+        
         ########## Code ends here ##########
         return H
 
@@ -141,7 +181,53 @@ class CameraCalibrator:
         HINT: What is the size of V?
         """
         ########## Code starts here ##########
+        n = len(H)
+        v12 = np.zeros((n, 6))
+        v11 = np.zeros((n, 6))
+        v22 = np.zeros((n, 6))
+        V = np.zeros((1,6))
+        
+        
+        for k in range(n):
+            h1 = H[k][:,0]
+            h2 = H[k][:,1]
+            h3 = H[k][:,2]
+            v12 = np.array([h1[0]*h2[0], h1[0]*h2[1]+h1[1]*h2[0], h1[1]*h2[1], h1[2]*h2[0]+h1[0]*h2[2], h1[2]*h2[1]+h1[1]*h2[2], h1[2]*h2[2]])
+            v11 = np.array([h1[0]*h1[0], h1[0]*h1[1]+h1[1]*h1[0], h1[1]*h1[1], h1[2]*h1[0]+h1[0]*h1[2], h1[2]*h1[1]+h1[1]*h1[2], h1[2]*h1[2]])
+            v22 = np.array([h2[0]*h2[0], h2[0]*h2[1]+h2[1]*h2[0], h2[1]*h2[1], h2[2]*h2[0]+h2[0]*h2[2], h2[2]*h2[1]+h2[1]*h2[2], h2[2]*h2[2]])
+            V_temp = np.vstack((v12, (v11-v22)))
+            V = np.vstack((V,V_temp))
+        V = V[1:, :]
+        
+        """
+        for k in range(n):
+            h1 = H[k][:,0]
+            h2 = H[k][:,1]
+            h3 = H[k][:,2]
+            v12[k,:] = np.array([h1[0]*h2[0], h1[0]*h2[1]+h1[1]*h2[0], h1[1]*h2[1], h1[2]*h2[0]+h1[0]*h2[2], h1[2]*h2[1]+h1[1]*h2[2], h1[2]*h2[2]])
+            v11[k,:] = np.array([h1[0]*h1[0], h1[0]*h1[1]+h1[1]*h1[0], h1[1]*h1[1], h1[2]*h1[0]+h1[0]*h1[2], h1[2]*h1[1]+h1[1]*h1[2], h1[2]*h1[2]])
+            v22[k,:] = np.array([h2[0]*h2[0], h2[0]*h2[1]+h2[1]*h2[0], h2[1]*h2[1], h2[2]*h2[0]+h2[0]*h2[2], h2[2]*h2[1]+h2[1]*h2[2], h2[2]*h2[2]])
+        V = np.vstack((v12, np.subtract(v11,v22)))
+        """
+        _, s, vh = np.linalg.svd(V)
+        b = vh[-1, :]
+        B = np.zeros((3,3))
 
+        B[0] = [b[0], b[1], b[3]]
+        B[1] = [b[1], b[2], b[4]]
+        B[2] = [b[3], b[4], b[5]]
+
+        A = np.zeros((3,3))
+        A[1,2] = (B[0,1]*B[0,2]-B[0,0]*B[1,2])/(B[0,0]*B[1,1]-B[0,1]**2)#v0
+        lamb = B[2,2]-(B[0,2]**2+A[1,2]*(B[0,1]*B[0,2]-B[0,0]*B[1,2]))/B[0,0]
+        
+        A[0,0] = np.sqrt(lamb/B[0,0]) #alpha
+        A[1,1] = np.sqrt(lamb*B[0,0]/(B[0,0]*B[1,1]-B[0,1]**2)) #beta
+        A[0,1] = -B[0,1]*A[0,0]**2*A[1,1]/lamb #gamma
+        A[0,2] = A[0,1]*A[1,2]/A[1,1]-B[0,2]*A[0,0]**2/lamb #u0
+        A[2,2] = 1
+        
+        
         ########## Code ends here ##########
         return A
 
@@ -155,7 +241,23 @@ class CameraCalibrator:
             t: the translation vector
         """
         ########## Code starts here ##########
-
+        A_inv = np.linalg.inv(A)
+        lam = 1/np.linalg.norm(np.matmul(A_inv,H[:,0]))
+        
+        r1 = lam*np.matmul(A_inv,H[:,0])
+        r2 = lam*np.matmul(A_inv,H[:,1])
+        r3 = np.cross(r1,r2)
+        t = lam*np.matmul(A_inv,H[:,2])
+        
+        r1 = np.reshape(r1, (3, 1))
+        r2 = np.reshape(r2, (3, 1))
+        r3 = np.reshape(r3, (3, 1))
+        #R_ = np.vstack((r1,r2,r3))
+        R_ = np.hstack((r1,r2,r3))
+        U, s, vh = np.linalg.svd(R_)
+        
+        R = np.matmul(U,vh)       # Appendix C, second to last sentence
+        
         ########## Code ends here ##########
         return R, t
 
@@ -172,7 +274,14 @@ class CameraCalibrator:
 
         """
         ########## Code starts here ##########
-
+        x = np.zeros(np.shape(X))
+        y = np.zeros(np.shape(X))
+        t = np.reshape(t, (3,1))
+        for k in range(len(X)):
+            M = np.vstack((X[k], Y[k], Z[k]))
+            m = t + np.matmul(R,M)
+            x[k] = m[0]
+            y[k] = m[1]
         ########## Code ends here ##########
         return x, y
 
@@ -189,6 +298,15 @@ class CameraCalibrator:
             u, v: the coordinates in the ideal pixel image plane
         """
         ########## Code starts here ##########
+        u = np.zeros(np.shape(X))
+        v = np.zeros(np.shape(X))
+        t = np.reshape(t, (3,1))
+        Rt = np.hstack((R, t))
+        for k in range(len(X)):
+            M_bar = np.vstack((X[k], Y[k], Z[k], 1))
+            m_bar = np.matmul(A, np.matmul(Rt, M_bar))
+            u[k] = m_bar[0]/m_bar[-1]
+            v[k] = m_bar[1]/m_bar[-1]
 
         ########## Code ends here ##########
         return u, v

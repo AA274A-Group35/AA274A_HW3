@@ -228,9 +228,10 @@ def main():
               'MIN_POINTS_PER_SEGMENT': MIN_POINTS_PER_SEGMENT,
               'MAX_P2P_DIST': MAX_P2P_DIST}
 
-    alpha, r, segend, pointIdx = ExtractLines(RangeData, params)
+    #alpha, r, segend, pointIdx = ExtractLines(RangeData, params)
 
     ax = PlotScene()
+    plt.show(ax)
     ax = PlotData(RangeData, ax)
     ax = PlotRays(RangeData, ax)
     ax = PlotLines(segend, ax)
