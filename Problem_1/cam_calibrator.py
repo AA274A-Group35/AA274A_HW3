@@ -134,19 +134,7 @@ class CameraCalibrator:
         """
         ########## Code starts here ##########
         n = self.n_corners_per_chessboard
-        """
-        M_bar = np.transpose(np.vstack((X,Y,np.ones_like(X))))
-        uM_bar = np.transpose(np.vstack((X,Y,np.ones_like(X))))
-        vM_bar = np.transpose(np.vstack((X,Y,np.ones_like(X))))
-        for k in range(n):
-            uM_bar[k] = -1*u_meas[k]*uM_bar[k, :]
-            vM_bar[k] = -1*v_meas[k]*vM_bar[k, :]
         
-        L_top = np.hstack((M_bar, np.zeros_like(M_bar), uM_bar))
-        L_bottom = np.hstack((np.zeros_like(M_bar), M_bar, vM_bar))
-        
-        L = np.vstack((L_top, L_bottom))
-        """
         L = np.zeros((1,9))
         
         for k in range(n):
@@ -199,16 +187,6 @@ class CameraCalibrator:
             V = np.vstack((V,V_temp))
         V = V[1:, :]
         
-        """
-        for k in range(n):
-            h1 = H[k][:,0]
-            h2 = H[k][:,1]
-            h3 = H[k][:,2]
-            v12[k,:] = np.array([h1[0]*h2[0], h1[0]*h2[1]+h1[1]*h2[0], h1[1]*h2[1], h1[2]*h2[0]+h1[0]*h2[2], h1[2]*h2[1]+h1[1]*h2[2], h1[2]*h2[2]])
-            v11[k,:] = np.array([h1[0]*h1[0], h1[0]*h1[1]+h1[1]*h1[0], h1[1]*h1[1], h1[2]*h1[0]+h1[0]*h1[2], h1[2]*h1[1]+h1[1]*h1[2], h1[2]*h1[2]])
-            v22[k,:] = np.array([h2[0]*h2[0], h2[0]*h2[1]+h2[1]*h2[0], h2[1]*h2[1], h2[2]*h2[0]+h2[0]*h2[2], h2[2]*h2[1]+h2[1]*h2[2], h2[2]*h2[2]])
-        V = np.vstack((v12, np.subtract(v11,v22)))
-        """
         _, s, vh = np.linalg.svd(V)
         b = vh[-1, :]
         B = np.zeros((3,3))
@@ -280,8 +258,8 @@ class CameraCalibrator:
         for k in range(len(X)):
             M = np.vstack((X[k], Y[k], Z[k]))
             m = t + np.matmul(R,M)
-            x[k] = m[0]
-            y[k] = m[1]
+            x[k] = m[0]/m[2]
+            y[k] = m[1]/m[2]
         ########## Code ends here ##########
         return x, y
 
